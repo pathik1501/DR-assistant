@@ -38,7 +38,7 @@ This system provides:
 
 | Metric | Target | Description |
 |--------|--------|-------------|
-| **QWK** | ≥ 0.88 | Quadratic Weighted Kappa |
+| **QWK** | ≥ 0.80 | Quadratic Weighted Kappa |
 | **Macro F1** | ≥ 0.79 | Average F1 across classes |
 | **ECE** | < 0.05 | Expected Calibration Error |
 | **Abstention Rate** | 10-15% | Low confidence predictions |
