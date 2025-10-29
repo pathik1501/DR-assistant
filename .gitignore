@@ -1,0 +1,123 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Data files (too large for GitHub)
+data/
+*.csv
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.ckpt
+*.pth
+*.pt
+
+# Model checkpoints and outputs
+1/
+models/
+checkpoints/
+*.ckpt
+*.pth
+
+# Logs and outputs
+logs/
+outputs/
+mlflow.db
+mlruns/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# API Keys and secrets
+*_key.txt
+secrets.yaml
+config_secrets.yaml
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+*.swp
+*~
+api_response.json
+test_output.txt
+api_response_*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Large files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Python cache
+*.pyc
+__pycache__/
+
+# MLflow
+mlflow.db
+mlruns/
+
+# Vector databases
+data/vector_db/
+*.faiss
+*.pkl
+
+# Test outputs
+test_*.json
+*_test_output.json
+

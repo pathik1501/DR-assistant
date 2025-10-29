@@ -1,0 +1,73 @@
+# Dataset Configuration
+data:
+  aptos_path: "data/aptos2019/aptos2019-blindness-detection"
+  eyepacs_path: "data/eyepacs/augmented_resized_V2"
+  output_size: [224, 224]
+  batch_size: 2
+  num_workers: 1
+  
+# Model Configuration
+model:
+  architecture: "efficientnet_b0"
+  pretrained: true
+  num_classes: 5
+  dropout_rate: 0.3
+  
+# Training Configuration
+training:
+  epochs: 150
+  learning_rate: 0.0002  # Slightly lower learning rate
+  weight_decay: 0.0005   # Increased regularization
+  focal_loss_gamma: 2.0
+  patience: 15           # More patience
+  label_smoothing: 0.1   # Reduce overconfidence
+  mixup_alpha: 0.4       # Mixup augmentation
+  
+# Data Augmentation
+augmentation:
+  rotation_limit: 90
+  brightness_limit: 0.2
+  contrast_limit: 0.2
+  hue_shift_limit: 20
+  saturation_shift_limit: 30
+  
+# Uncertainty & Calibration
+uncertainty:
+  mc_dropout_samples: 30
+  confidence_threshold: 0.5
+  temperature_scaling: true
+  
+# Explainability
+explainability:
+  grad_cam_layers: ["backbone.blocks.5.0", "backbone.blocks.6.0"]
+  save_heatmaps: true
+  
+# MLflow Configuration
+mlflow:
+  experiment_name: "diabetic_retinopathy_detection"
+  tracking_uri: "sqlite:///mlflow.db"
+  
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8080
+  workers: 1
+  
+# Monitoring
+monitoring:
+  prometheus_port: 9090
+  grafana_port: 3000
+  
+# RAG Configuration
+rag:
+  vector_db_path: "data/vector_db"
+  embedding_model: "text-embedding-3-small"
+  llm_model: "gpt-4o-mini"
+  top_k: 3
+  
+# Paths
+paths:
+  models_dir: "models"
+  logs_dir: "logs"
+  data_dir: "data"
+  outputs_dir: "outputs"
