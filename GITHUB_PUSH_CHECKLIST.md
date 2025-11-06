@@ -1,163 +1,112 @@
-# ✅ GitHub Push Checklist - Final Guide
+# GitHub Push Checklist
 
-## 📦 What to Push
+## ✅ Pre-Push Security Check
 
-### ✅ Safe to Push (74 files total)
-
-**Source Code:**
-- ✅ `src/*.py` (all Python modules)
-- ✅ `frontend/*.py` (both UIs)
-
-**Configuration:**
-- ✅ `configs/config.yaml` (no secrets)
-- ✅ `requirements.txt` & `requirements_simple.txt`
-
-**Infrastructure:**
-- ✅ `Dockerfile`
-- ✅ `docker-compose.yml`
-- ✅ `setup.py` & `simple_setup.py`
-- ✅ `.gitignore`
-
-**Scripts:**
-- ✅ `deploy.py`
-- ✅ `launch_monitoring.py`
-- ✅ `download_datasets.py`
-- ✅ `*.ps1` (PowerShell scripts - **CLEANED** ✅)
-
-**Tests:**
-- ✅ `tests/test_dr_system.py`
-
-**Monitoring:**
-- ✅ `monitoring/prometheus.yml`
-- ✅ `monitoring/grafana/`
-
-**Documentation:**
-- ✅ All `*.md` files (~25 files)
-
-**Other:**
-- ✅ `test_*.py` files (optional, can exclude if too many)
-
-### ❌ Automatically Excluded (via .gitignore)
-
-These are **NOT** pushed automatically:
-- ❌ `data/` (datasets - too large)
-- ❌ `1/` (MLflow runs/checkpoints)
-- ❌ `logs/` (training logs)
-- ❌ `outputs/` (evaluation outputs)
-- ❌ `*.ckpt` (model checkpoints)
-- ❌ `mlflow.db` & `mlruns/`
-- ❌ `__pycache__/`
-- ❌ `*.pyc`, `*.log`, `*.tmp`
-
-## 🔒 Security Status
-
-### ✅ Already Cleaned:
-- ✅ `restart_with_ui_fixes.ps1` - Uses environment variables
-- ✅ `start_server.ps1` - Uses environment variables  
-- ✅ `restart_server.ps1` - Uses environment variables
-- ✅ `src/rag_pipeline.py` - Uses `os.getenv()` (safe)
-
-### ⚠️ Check These (Should be clean now):
-- ✅ All PowerShell scripts checked and cleaned
-- ✅ No API keys in Python code
-- ✅ Config files use templates
-
-## 🚀 Quick Push Commands
-
-### Option 1: Push Everything (Recommended)
+### 1. Verify No Sensitive Files
 ```bash
-git init
-git add .
-git status  # Review what will be pushed
-git commit -m "Initial commit: DR Assistant - Diabetic Retinopathy Detection System"
-git remote add origin https://github.com/yourusername/DR-assistant.git
-git push -u origin main
+# Check if .env is tracked (should return nothing)
+git ls-files | grep -E "\.env$|\.env\.|secrets|api.*key"
+
+# Check for hardcoded API keys in code
+grep -r "sk-proj-" src/ frontend/ --exclude-dir=__pycache__
 ```
 
-### Option 2: Selective Push
+### 2. Files to Commit
+
+#### ✅ Safe to Commit
+- `src/` - All source code (no hardcoded keys)
+- `frontend/` - Frontend code
+- `configs/config.yaml` - Configuration (no secrets)
+- `requirements.txt` - Dependencies
+- `.gitignore` - Git ignore rules
+- `.env.example` - Environment template
+- `README.md` - Documentation
+- `DEPLOYMENT_GUIDE.md` - Deployment instructions
+- `Dockerfile` - Docker configuration
+- `docker-compose.yml` - Docker compose config
+
+#### ❌ Never Commit
+- `.env` - Contains API keys (in .gitignore ✅)
+- `data/vector_db/` - Vector database (in .gitignore ✅)
+- `*.ckpt`, `*.pth` - Model checkpoints (in .gitignore ✅)
+- `mlflow.db`, `mlruns/` - MLflow data (in .gitignore ✅)
+- `__pycache__/` - Python cache (in .gitignore ✅)
+- `outputs/` - Training outputs (in .gitignore ✅)
+
+## 📝 Git Commands
+
+### Check Status
 ```bash
-git init
-
-# Add core files
-git add src/ frontend/ configs/ tests/
-git add Dockerfile docker-compose.yml
-git add requirements*.txt
-git add setup.py simple_setup.py
-git add deploy.py launch_monitoring.py
-git add monitoring/
-git add *.md
-git add .gitignore
-
-# Review
 git status
-
-# Commit and push
-git commit -m "Initial commit"
-git remote add origin <your-repo-url>
-git push -u origin main
 ```
 
-## 📋 Pre-Push Verification
-
-### 1. Check for Secrets
-```powershell
-# Search for API keys
-Select-String -Path "*.ps1","*.py","*.yaml" -Pattern "sk-proj"
-```
-Should return: **No matches** ✅
-
-### 2. Check File Sizes
+### Add Files
 ```bash
-# Check for large files
-Get-ChildItem -Recurse | Where-Object {$_.Length -gt 50MB} | Select-Object FullName, Length
+# Add all safe files
+git add src/
+git add frontend/
+git add configs/
+git add requirements.txt
+git add .gitignore
+git add .env.example
+git add README.md
+git add DEPLOYMENT_GUIDE.md
+git add Dockerfile
+git add docker-compose.yml
 ```
-Should show: **Only excluded files** ✅
 
-### 3. Review .gitignore
+### Commit
 ```bash
-cat .gitignore
+git commit -m "Add DR Assistant: RAG pipeline, frontend improvements, and deployment config"
 ```
-Should exclude: `data/`, `logs/`, `outputs/`, `*.ckpt`, etc. ✅
 
-### 4. Test Repository
+### Push
 ```bash
-git add .
-git status  # Should NOT show data/, logs/, checkpoints/
+git push origin main
+# or
+git push origin master
 ```
 
-## 📊 Repository Size Estimate
+## 🔍 Final Verification
 
-**Pushed files:** ~74 files
-**Total size:** <5MB (excluding excluded files)
-**Excluded size:** ~10GB+ (data, models, logs)
+Before pushing, verify:
+1. ✅ `.env` is NOT in `git status` output
+2. ✅ No API keys in source code (checked with grep)
+3. ✅ `.env.example` exists as template
+4. ✅ `.gitignore` includes all sensitive files
+5. ✅ All relevant code files are staged
 
-## 🎯 Final Checklist
+## 🚨 If You Accidentally Committed .env
 
-Before pushing:
+If `.env` was committed:
+```bash
+# Remove from git (but keep local file)
+git rm --cached .env
 
-- [x] ✅ `.gitignore` created and committed
-- [x] ✅ API keys removed from PowerShell scripts
-- [x] ✅ All source code present (`src/`, `frontend/`)
-- [x] ✅ Configuration files present (`configs/`)
-- [x] ✅ Documentation included (`*.md`)
-- [x] ✅ Infrastructure files included (Docker, requirements)
-- [x] ✅ No secrets in code
-- [x] ✅ No large data files
-- [x] ✅ No model checkpoints
-- [x] ✅ `git status` looks correct
+# Add to .gitignore (already there)
+# Then commit the removal
+git commit -m "Remove .env from tracking"
 
-## 🎉 You're Ready!
+# If already pushed, you need to:
+# 1. Rotate your API key immediately
+# 2. Force push (dangerous - coordinate with team)
+# 3. Or use git filter-branch to remove from history
+```
 
-**All files are cleaned and ready for GitHub!**
+## 📦 What Gets Deployed
 
-**Next steps:**
-1. Initialize git: `git init`
-2. Add files: `git add .`
-3. Commit: `git commit -m "Initial commit"`
-4. Create GitHub repo
-5. Push: `git push -u origin main`
+When you push to GitHub:
+- ✅ All source code
+- ✅ Configuration files (no secrets)
+- ✅ Documentation
+- ✅ Docker files
+- ❌ No API keys
+- ❌ No model checkpoints (too large)
+- ❌ No vector database (can be regenerated)
 
----
+## 🔐 Environment Variables for Deployment
 
-**Status**: ✅ **100% Ready for GitHub!** 🚀
-
+For deployment platforms, set these environment variables:
+- `OPENAI_API_KEY` - Required for RAG features
+- `API_PORT` - Optional (default: 8080)
+- `FRONTEND_PORT` - Optional (default: 8501)

@@ -31,3 +31,5 @@ streamlit run frontend/app_new.py
 Write-Host ""
 Write-Host "UI will open in your browser at: http://localhost:8501" -ForegroundColor Cyan
 
+
+

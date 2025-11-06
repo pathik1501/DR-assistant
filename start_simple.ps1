@@ -1,33 +1,34 @@
-# Stop existing servers
-Get-Process python -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -like "*src/inference.py*"} | Stop-Process -Force
-
+# Simple DR Assistant Startup
 Write-Host ""
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  DR Assistant - Simplified Version" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "================================" -ForegroundColor Green
+Write-Host "  DR Assistant - Simple Mode" -ForegroundColor Green
+Write-Host "================================" -ForegroundColor Green
 Write-Host ""
 
-Start-Sleep -Seconds 2
-
-# Start server
-Write-Host "Starting server..." -ForegroundColor Yellow
-cd "C:\Users\pathi\Documents\DR assistant"
-# Set API key from environment variable (set before running)
-if (-not $env:OPENAI_API_KEY) {
-    Write-Host "[WARNING] OPENAI_API_KEY not set. RAG features may not work." -ForegroundColor Yellow
+# Check API
+Write-Host "Checking API..." -ForegroundColor Yellow
+try {
+    $response = Invoke-WebRequest -Uri "http://localhost:8080/health" -TimeoutSec 2 -UseBasicParsing
+    Write-Host "✅ API is running" -ForegroundColor Green
+} catch {
+    Write-Host "❌ API not running. Starting it..." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "You need to start the API server in a separate terminal:" -ForegroundColor Yellow
+    Write-Host "  python src/inference.py" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Then come back and run this script again." -ForegroundColor Yellow
+    Write-Host ""
+    exit
 }
-Start-Process python -ArgumentList "src/inference.py"
 
 Write-Host ""
-Write-Host "[OK] Server starting..." -ForegroundColor Green
+Write-Host "Starting simple frontend..." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "What's fixed:" -ForegroundColor Cyan
-Write-Host "  - No more blank heatmaps" -ForegroundColor White
-Write-Host "  - Shows only prediction and confidence" -ForegroundColor White
-Write-Host "  - Clinical hints now working" -ForegroundColor White
-Write-Host "  - Clean, simple output" -ForegroundColor White
+Write-Host "The interface will open in your browser." -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Access: http://localhost:8080/docs" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "Wait 10 seconds for server to start..." -ForegroundColor Gray
 
+# Start Streamlit
+streamlit run simple_frontend.py
+
+Write-Host ""
+Write-Host "Done!" -ForegroundColor Green
