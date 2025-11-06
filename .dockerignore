@@ -1,0 +1,130 @@
+# Large MLflow runs and checkpoints
+1/
+mlruns/
+mlflow.db
+
+# Model checkpoints (download at runtime)
+*.ckpt
+*.pth
+*.pt
+models/
+checkpoints/
+
+# Data files (too large)
+data/
+*.csv
+*.h5
+*.hdf5
+
+# Logs and outputs
+logs/
+outputs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (not needed in Docker)
+*.md
+!README.md
+!DEPLOYMENT.md
+
+# Frontend (deploy separately to Netlify)
+frontend/
+serve_frontend.py
+simple_frontend.py
+
+# Test files
+test_*.py
+*_test.py
+tests/
+test_*.jpg
+test_*.json
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+api_response*.json
+test_output.txt
+
+# Environment files
+.env
+.env.*
+*.env
+
+# OS files
+Thumbs.db
+desktop.ini
+
+# Large archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Vector databases (will be created at runtime)
+data/vector_db/
+*.faiss
+*.index
+
+# Scripts (not needed in Docker)
+*.ps1
+*.sh
+deploy*.py
+prepare_*.py
+push_*.py
+include_*.ps1
+kill_*.ps1
+check_*.ps1
+start_*.ps1
+stop_*.ps1
+restart_*.ps1
+
+# Monitoring (optional, can deploy separately)
+monitoring/
+
+# Docker files (don't copy into Docker)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Railway/Render configs (not needed in image)
+railway.json
+nixpacks.toml
+.railwayignore
+Procfile
+runtime.txt
+
