@@ -14,7 +14,7 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from sklearn.model_selection import StratifiedKFold
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 import yaml
 
 
@@ -167,7 +167,8 @@ class DataProcessor:
         val_paths: List[str],
         val_labels: List[int],
         test_paths: List[str],
-        test_labels: List[int]
+        test_labels: List[int],
+        use_weighted_sampling: bool = False
     ) -> Tuple[DataLoader, DataLoader, DataLoader]:
         """Create data loaders for train, validation, and test sets."""
         
@@ -189,13 +190,43 @@ class DataProcessor:
             is_training=False
         )
         
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=self.data_config['batch_size'],
-            shuffle=True,
-            num_workers=self.data_config['num_workers'],
-            pin_memory=True
-        )
+        # Setup train loader with optional weighted sampling
+        if use_weighted_sampling:
+            # Calculate sample weights (inverse frequency)
+            train_labels_np = np.array(train_labels)
+            class_counts = np.bincount(train_labels_np, minlength=5)
+            # Avoid division by zero
+            class_counts = np.where(class_counts == 0, 1, class_counts)
+            class_weights_sample = 1.0 / class_counts
+            sample_weights = [class_weights_sample[label] for label in train_labels]
+            
+            sampler = WeightedRandomSampler(
+                weights=sample_weights,
+                num_samples=len(sample_weights),
+                replacement=True
+            )
+            
+            print(f"Using weighted sampling for training:")
+            for i in range(5):
+                count = class_counts[i]
+                weight = class_weights_sample[i]
+                print(f"  Class {i}: {count:5d} samples, sampling weight: {weight:.4f}")
+            
+            train_loader = DataLoader(
+                train_dataset,
+                batch_size=self.data_config['batch_size'],
+                sampler=sampler,
+                num_workers=self.data_config['num_workers'],
+                pin_memory=True
+            )
+        else:
+            train_loader = DataLoader(
+                train_dataset,
+                batch_size=self.data_config['batch_size'],
+                shuffle=True,
+                num_workers=self.data_config['num_workers'],
+                pin_memory=True
+            )
         
         val_loader = DataLoader(
             val_dataset,
@@ -215,8 +246,12 @@ class DataProcessor:
         
         return train_loader, val_loader, test_loader
     
-    def prepare_datasets(self) -> Tuple[DataLoader, DataLoader, DataLoader]:
-        """Prepare complete datasets with train/val/test split."""
+    def prepare_datasets(self) -> Tuple[DataLoader, DataLoader, DataLoader, List[int]]:
+        """Prepare complete datasets with train/val/test split.
+        
+        Returns:
+            train_loader, val_loader, test_loader, train_labels
+        """
         
         # Load both datasets
         aptos_paths, aptos_labels = self.load_aptos_data(self.data_config['aptos_path'])
@@ -254,11 +289,17 @@ class DataProcessor:
         
         print(f"Train: {len(train_paths)}, Val: {len(val_paths)}, Test: {len(test_paths)}")
         
-        return self.create_data_loaders(
+        # Check if weighted sampling is enabled
+        use_weighted_sampling = self.config.get('training', {}).get('use_weighted_sampling', False)
+        
+        train_loader, val_loader, test_loader = self.create_data_loaders(
             train_paths, train_labels,
             val_paths, val_labels,
-            test_paths, test_labels
+            test_paths, test_labels,
+            use_weighted_sampling=use_weighted_sampling
         )
+        
+        return train_loader, val_loader, test_loader, train_labels
 
 
 def main():
@@ -266,12 +307,13 @@ def main():
     processor = DataProcessor()
     
     try:
-        train_loader, val_loader, test_loader = processor.prepare_datasets()
+        train_loader, val_loader, test_loader, train_labels = processor.prepare_datasets()
         
         print("Data loaders created successfully!")
         print(f"Train batches: {len(train_loader)}")
         print(f"Val batches: {len(val_loader)}")
         print(f"Test batches: {len(test_loader)}")
+        print(f"Training labels count: {len(train_labels)}")
         
         # Test a batch
         for images, labels in train_loader:

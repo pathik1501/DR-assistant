@@ -1,148 +1,202 @@
-# Deployment Guide - Diabetic Retinopathy Assistant
+# Deployment Guide for DR Assistant
 
-## Quick Start
+## 🚀 Pre-Deployment Checklist
 
-Your trained model is ready to deploy! Here's how to get it running.
+### 1. Security Check ✅
+- [x] `.env` file is in `.gitignore`
+- [x] No API keys hardcoded in source files
+- [x] `.env.example` created for reference
+- [x] All sensitive files excluded
 
-## Current Status
+### 2. Files to Commit
 
-- **Model Checkpoint**: `1/7d0928bb87954a739123ca35fa03cccf/checkpoints/dr-model-epoch=11-val_qwk=0.769.ckpt`
-- **Performance**: QWK 0.769 (solid baseline)
-- **API Ready**: FastAPI server configured
-- **Web UI Ready**: Streamlit interface configured
+#### Core Application Files
+```
+src/
+├── inference.py          # FastAPI backend
+├── rag_pipeline.py      # RAG pipeline for explanations
+├── model.py             # Model architecture
+├── explainability.py    # Grad-CAM visualizations
+├── train.py             # Training script
+└── ...
 
-## Deployment Options
+frontend/
+├── app_new.py           # Streamlit frontend
+└── ...
 
-### Option 1: Simple API Server (Recommended for Testing)
+configs/
+└── config.yaml          # Configuration (no secrets)
 
+requirements.txt         # Python dependencies
+.gitignore              # Git ignore rules
+.env.example            # Environment template
+README.md               # Project documentation
+```
+
+#### Files to EXCLUDE (already in .gitignore)
+- `.env` - Contains API keys
+- `data/vector_db/` - Vector database (can be regenerated)
+- `*.ckpt`, `*.pth` - Model checkpoints (too large)
+- `mlflow.db`, `mlruns/` - MLflow data
+- `__pycache__/` - Python cache
+- `outputs/` - Training outputs
+
+### 3. Environment Setup
+
+#### For Local Development
+1. Copy `.env.example` to `.env`
+2. Add your OpenAI API key to `.env`
+3. Install dependencies: `pip install -r requirements.txt`
+4. Run API: `python src/inference.py`
+5. Run Frontend: `streamlit run frontend/app_new.py`
+
+#### For Production Deployment
+
+**Option 1: Docker (Recommended)**
 ```bash
-python deploy.py
+# Build and run with docker-compose
+docker-compose up -d
 ```
 
-This will:
-- Load your trained model (QWK 0.769)
-- Start FastAPI server on http://localhost:8000
-- Provide interactive docs at http://localhost:8000/docs
+**Option 2: Cloud Platform (Heroku, Railway, etc.)**
+1. Set environment variables in platform dashboard
+2. Deploy using platform's deployment method
+3. Ensure `OPENAI_API_KEY` is set as environment variable
 
-### Option 2: Manual Start
+**Option 3: VPS/Server**
+1. Clone repository
+2. Create `.env` file with production values
+3. Use systemd or supervisor to run services
+4. Set up reverse proxy (nginx) for production
 
+## 📋 Deployment Steps
+
+### Step 1: Prepare Repository
 ```bash
-python src/inference.py
+# Check what will be committed
+git status
+
+# Ensure .env is not tracked
+git check-ignore .env
+
+# Add files
+git add src/ frontend/ configs/ requirements.txt .gitignore .env.example README.md
 ```
 
-### Option 3: Web Interface
-
+### Step 2: Commit Changes
 ```bash
-streamlit run frontend/app.py
+git commit -m "Add DR Assistant application with RAG pipeline and frontend"
 ```
 
-## API Usage
-
-Once the server is running, you can use it:
-
-### 1. Python Client
-
-```python
-import requests
-from PIL import Image
-import io
-
-# Load an image
-image = Image.open('path/to/fundus_image.jpg')
-
-# Convert to base64
-buffered = io.BytesIO()
-image.save(buffered, format="JPEG")
-img_str = base64.b64encode(buffered.getvalue())
-
-# Make prediction
-response = requests.post(
-    'http://localhost:8000/predict',
-    json={'image': img_str.decode()}
-)
-result = response.json()
-print(f"Grade: {result['prediction']}")
-print(f"Confidence: {result['confidence']}")
-```
-
-### 2. cURL
-
+### Step 3: Push to GitHub
 ```bash
-curl -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/json" \
-  -d @request.json
+git push origin main
 ```
 
-### 3. Interactive Docs
+### Step 4: Set Up Environment Variables
 
-Visit http://localhost:8000/docs for interactive API documentation.
+**On GitHub (for CI/CD):**
+- Go to Settings → Secrets and variables → Actions
+- Add `OPENAI_API_KEY` as a secret
 
-## API Endpoints
+**On Deployment Platform:**
+- Add `OPENAI_API_KEY` in environment variables section
+- Never commit `.env` file
 
-- **POST /predict** - Single image prediction
-- **GET /health** - Health check
-- **GET /metrics** - Prometheus metrics
-- **GET /model/info** - Model information
+## 🔒 Security Best Practices
 
-## Model Information
+1. **Never commit `.env` files**
+   - Already in `.gitignore` ✅
+   - Use `.env.example` as template ✅
 
-- **Architecture**: EfficientNet-B0
-- **Input Size**: 224x224
-- **Classes**: 5 (Grades 0-4)
-- **QWK**: 0.769
-- **Status**: Trained and ready
+2. **Use Environment Variables**
+   - All sensitive data loaded from environment
+   - No hardcoded keys in source code ✅
 
-## Next Steps
+3. **Rotate API Keys**
+   - If a key is exposed, regenerate it immediately
+   - Update `.env` file with new key
 
-1. **Start API**: `python deploy.py`
-2. **Test in browser**: Visit http://localhost:8000/docs
-3. **Deploy web UI**: `streamlit run frontend/app.py`
+4. **Review Commits**
+   - Before pushing, check: `git diff` to ensure no secrets
 
-## Production Deployment
+## 🐳 Docker Deployment
 
-For production deployment using Docker:
-
+### Build Docker Image
 ```bash
-# Build the image
-docker build -t dr-assistant .
-
-# Run the container
-docker run -p 8000:8000 dr-assistant
+docker build -t dr-assistant:latest .
 ```
 
-Or use docker-compose for full stack:
-
+### Run with Environment Variables
 ```bash
-docker-compose up --build
+docker run -d \
+  -p 8080:8080 \
+  -p 8501:8501 \
+  -e OPENAI_API_KEY=your-key-here \
+  dr-assistant:latest
 ```
 
-This deploys:
-- FastAPI server (port 8000)
-- Streamlit UI (port 8501)
-- MLflow (port 5000)
-- Prometheus (port 9090)
-- Grafana (port 3000)
+### Or use docker-compose.yml
+```bash
+# Edit docker-compose.yml to add environment variables
+# Then run:
+docker-compose up -d
+```
 
-## Monitoring
+## ☁️ Cloud Platform Deployment
 
-- **MLflow**: http://localhost:5000
-- **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3000
+### Heroku
+```bash
+heroku create dr-assistant
+heroku config:set OPENAI_API_KEY=your-key-here
+git push heroku main
+```
 
-## Troubleshooting
+### Railway
+1. Connect GitHub repository
+2. Add `OPENAI_API_KEY` in environment variables
+3. Deploy automatically on push
 
-### Model not found
-Make sure the checkpoint exists at the expected path.
+### AWS/GCP/Azure
+1. Use container services (ECS, Cloud Run, Container Instances)
+2. Set environment variables in platform
+3. Deploy container image
 
-### Import errors
-Run from the project root directory.
+## 📝 Post-Deployment
 
-### CUDA errors
-The model runs on CPU by default. GPU support requires CUDA setup.
+1. **Test API Health**
+   ```bash
+   curl https://your-domain.com/health
+   ```
 
-## Support
+2. **Test Frontend**
+   - Open frontend URL
+   - Upload test image
+   - Verify predictions work
 
-For issues or questions, check:
-- `README.md` - Full project documentation
-- `OPTIMIZATION_REPORT.md` - Performance analysis
-- Logs in `logs/` directory
+3. **Monitor Logs**
+   - Check for errors
+   - Verify RAG pipeline initializes
+   - Monitor API response times
+
+## 🔧 Troubleshooting
+
+### API Key Not Working
+- Verify `.env` file exists and has correct key
+- Check environment variables are loaded
+- Restart server after changing `.env`
+
+### Vector Database Missing
+- RAG pipeline will create it automatically
+- Requires OpenAI API key with quota
+- First run may take a few minutes
+
+### Port Conflicts
+- Change ports in `configs/config.yaml`
+- Or set `API_PORT` and `FRONTEND_PORT` in `.env`
+
+## 📚 Additional Resources
+
+- [OpenAI API Documentation](https://platform.openai.com/docs)
+- [Streamlit Deployment](https://docs.streamlit.io/deploy)
+- [FastAPI Deployment](https://fastapi.tiangolo.com/deployment/)

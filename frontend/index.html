@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DR Assistant - Diabetic Retinopathy Detection</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>👁️ Diabetic Retinopathy Detection Assistant</h1>
+            <p class="subtitle">AI-Powered Retinal Image Analysis: Classification • Grad-CAM Heatmaps • Clinical Recommendations</p>
+            <div id="api-status" class="api-status disconnected">
+                <span id="api-status-icon">🔴</span>
+                <span id="api-status-text">API Not Connected</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <h2>📤 Upload Retinal Fundus Image</h2>
+                <div class="upload-area" id="upload-area">
+                    <input type="file" id="image-input" accept="image/jpeg,image/jpg,image/png" hidden>
+                    <div class="upload-content">
+                        <div class="upload-icon">📷</div>
+                        <p>Drag and drop an image here, or <label for="image-input" class="browse-link">browse</label></p>
+                        <p class="upload-hint">Supported formats: JPG, JPEG, PNG</p>
+                    </div>
+                </div>
+                <div id="image-preview" class="image-preview hidden">
+                    <img id="preview-img" src="" alt="Preview">
+                    <div class="image-info" id="image-info"></div>
+                </div>
+            </section>
+
+            <!-- Options Section -->
+            <section class="options-section">
+                <h3>⚙️ Analysis Options</h3>
+                <div class="options-grid">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="include-explanation" checked>
+                        <span>Include Grad-CAM Explanation</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="include-hint" checked>
+                        <span>Include Clinical Recommendation</span>
+                    </label>
+                </div>
+                <button id="analyze-btn" class="analyze-btn" disabled>🔍 Analyze Image</button>
+            </section>
+
+            <!-- Loading Indicator -->
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Analyzing image... This may take 10-30 seconds</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results-section" class="results-section hidden">
+                <h2>📊 Analysis Results</h2>
+
+                <!-- Classification Card -->
+                <div class="classification-card" id="classification-card">
+                    <div class="classification-content">
+                        <div class="grade-icon" id="grade-icon">✅</div>
+                        <h2 class="grade-title" id="grade-title">Grade 0</h2>
+                        <p class="grade-description" id="grade-description">No Diabetic Retinopathy</p>
+                        <div class="confidence-display">
+                            <span class="confidence-label">Confidence:</span>
+                            <span class="confidence-value" id="confidence-value">85.0%</span>
+                        </div>
+                        <div class="processing-time" id="processing-time">Processing Time: 12.34s</div>
+                    </div>
+                    <div class="confidence-gauge-container">
+                        <div class="confidence-gauge" id="confidence-gauge">
+                            <div class="gauge-fill" id="gauge-fill"></div>
+                            <div class="gauge-text" id="gauge-text">85%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Heatmaps Section -->
+                <div id="heatmaps-section" class="heatmaps-section hidden">
+                    <h3>🔍 Grad-CAM Visualization</h3>
+                    <div class="heatmaps-grid" id="heatmaps-grid">
+                        <!-- Heatmaps will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Clinical Recommendation Section -->
+                <div id="recommendation-section" class="recommendation-section hidden">
+                    <h3>💡 Clinical Recommendation (RAG)</h3>
+                    <div class="recommendation-box" id="recommendation-box">
+                        <p id="recommendation-text"></p>
+                    </div>
+                    <div class="disclaimer">
+                        <small>ℹ️ <strong>Note:</strong> This recommendation is generated by our RAG pipeline combining evidence-based guidelines with AI-powered analysis. Always consult with a qualified ophthalmologist for professional medical advice.</small>
+                    </div>
+                </div>
+
+                <!-- Download Button -->
+                <div class="download-section">
+                    <button id="download-btn" class="download-btn">📥 Download Report (JSON)</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <p><strong>Diabetic Retinopathy Detection Assistant</strong></p>
+            <p>Powered by EfficientNet-B0 | Grad-CAM | RAG Pipeline</p>
+            <p class="disclaimer-text">⚠️ For research and educational purposes only. Not intended for clinical diagnosis.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
+

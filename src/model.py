@@ -148,12 +148,31 @@ class UncertaintyEstimator:
 def calculate_qwk(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """Calculate Quadratic Weighted Kappa."""
     from sklearn.metrics import cohen_kappa_score
+    import warnings
     
-    # Convert predictions to integers
-    y_pred_int = np.round(y_pred).astype(int)
-    y_pred_int = np.clip(y_pred_int, 0, 4)
-    
-    return cohen_kappa_score(y_true, y_pred_int, weights='quadratic')
+    try:
+        # Convert predictions to integers
+        y_pred_int = np.round(y_pred).astype(int)
+        y_pred_int = np.clip(y_pred_int, 0, 4)
+        
+        # Handle edge cases
+        if len(y_true) == 0 or len(y_pred_int) == 0:
+            return 0.0
+        
+        # Calculate QWK with error handling
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            qwk = cohen_kappa_score(y_true, y_pred_int, weights='quadratic')
+            
+            # Handle NaN or None values
+            if np.isnan(qwk) or qwk is None:
+                return 0.0
+            
+            return float(qwk)
+    except Exception as e:
+        # Log error but don't crash - return 0.0 as fallback
+        print(f"Warning: Error calculating QWK: {e}. Returning 0.0")
+        return 0.0
 
 
 def calculate_ece(
@@ -196,25 +215,60 @@ class ModelMetrics:
         
         metrics = {}
         
-        # Basic metrics
-        metrics['accuracy'] = accuracy_score(y_true, y_pred)
-        metrics['qwk'] = calculate_qwk(y_true, y_pred)
-        metrics['ece'] = calculate_ece(y_true, y_pred_probs.max(axis=1))
+        # Basic metrics with error handling
+        try:
+            metrics['accuracy'] = accuracy_score(y_true, y_pred)
+        except Exception as e:
+            print(f"Warning: Error calculating accuracy: {e}")
+            metrics['accuracy'] = 0.0
         
-        # Per-class metrics
-        precision, recall, f1, support = precision_recall_fscore_support(
-            y_true, y_pred, average=None
-        )
+        try:
+            metrics['qwk'] = calculate_qwk(y_true, y_pred)
+        except Exception as e:
+            print(f"Warning: Error calculating QWK: {e}")
+            metrics['qwk'] = 0.0
         
-        metrics['macro_f1'] = np.mean(f1)
-        metrics['weighted_f1'] = np.average(f1, weights=support)
-        
-        # Per-class F1 scores (handle missing classes)
-        for i in range(5):
-            if i < len(f1):
-                metrics[f'f1_class_{i}'] = f1[i]
+        try:
+            if y_pred_probs.ndim > 1:
+                max_probs = y_pred_probs.max(axis=1)
             else:
+                max_probs = y_pred_probs
+            metrics['ece'] = calculate_ece(y_true, max_probs)
+        except Exception as e:
+            print(f"Warning: Error calculating ECE: {e}")
+            metrics['ece'] = 0.0
+        
+        # Per-class metrics with error handling
+        try:
+            precision, recall, f1, support = precision_recall_fscore_support(
+                y_true, y_pred, average=None, zero_division=0
+            )
+            
+            metrics['macro_f1'] = float(np.mean(f1))
+            metrics['weighted_f1'] = float(np.average(f1, weights=support))
+            
+            # Per-class F1, Precision, Recall, and Support scores (handle missing classes)
+            for i in range(5):
+                if i < len(f1):
+                    metrics[f'f1_class_{i}'] = float(f1[i])
+                    metrics[f'precision_class_{i}'] = float(precision[i])
+                    metrics[f'recall_class_{i}'] = float(recall[i])
+                    metrics[f'support_class_{i}'] = int(support[i])
+                else:
+                    metrics[f'f1_class_{i}'] = 0.0
+                    metrics[f'precision_class_{i}'] = 0.0
+                    metrics[f'recall_class_{i}'] = 0.0
+                    metrics[f'support_class_{i}'] = 0
+        except Exception as e:
+            print(f"Warning: Error calculating per-class metrics: {e}")
+            # Set default values if calculation fails
+            metrics['macro_f1'] = 0.0
+            metrics['weighted_f1'] = 0.0
+            for i in range(5):
                 metrics[f'f1_class_{i}'] = 0.0
+                metrics[f'precision_class_{i}'] = 0.0
+                metrics[f'recall_class_{i}'] = 0.0
+                metrics[f'support_class_{i}'] = 0
         
         return metrics
 

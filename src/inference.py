@@ -4,25 +4,44 @@ Provides REST API endpoints for prediction and monitoring.
 """
 
 import os
+# Fix OMP error: Allow duplicate OpenMP libraries (workaround for PyTorch/NumPy conflicts)
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+
 import io
 import base64
 import json
 import time
+import logging
 from typing import Dict, List, Optional, Tuple
+from pathlib import Path
 import torch
 import torch.nn.functional as F
 import numpy as np
 from PIL import Image
 import cv2
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    # Load .env file from project root
+    env_path = Path(__file__).parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        # Try current directory
+        load_dotenv()
+except ImportError:
+    # dotenv not installed, skip loading .env file
+    pass
+
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 import uvicorn
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from prometheus_client.core import CollectorRegistry
 import yaml
-import logging
 
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,6 +50,19 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Log if .env file was loaded
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent.parent / '.env'
+    if env_path.exists():
+        logger.info(f"Loaded .env file from {env_path}")
+    else:
+        logger.info(f".env file not found at {env_path}, using environment variables")
+except ImportError:
+    logger.info("python-dotenv not installed, .env file will not be loaded")
+except Exception as e:
+    logger.warning(f"Could not check .env file: {e}")
+
 from src.model import DRModel, UncertaintyEstimator, TemperatureScaling
 from src.explainability import ExplainabilityPipeline
 try:
@@ -38,6 +70,13 @@ try:
 except Exception as e:
     logger.warning(f"RAG pipeline not available: {e}")
     RAGPipeline = None
+
+# Import albumentations for TTA
+try:
+    import albumentations as A
+except ImportError:
+    logger.warning("Albumentations not available for TTA")
+    A = None
 
 # Prometheus metrics
 registry = CollectorRegistry()
@@ -77,7 +116,9 @@ class PredictionResponse(BaseModel):
     confidence: float
     grade_description: str
     explanation: Optional[Dict] = None
-    clinical_hint: Optional[Dict] = None
+    clinical_hint: Optional[str] = None  # Changed from Dict to str for RAG hints
+    scan_explanation: Optional[str] = None  # Patient-friendly explanation of what the model sees
+    scan_explanation_doctor: Optional[str] = None  # Detailed clinical explanation for doctors
     processing_time: float
     abstained: bool = False
 
@@ -108,14 +149,41 @@ class DRPredictionService:
             self.explainability_config['grad_cam_layers']
         )
         
-        # Initialize RAG pipeline
+        # Initialize RAG pipeline (optional - system can run without it)
         if RAGPipeline is not None:
             try:
+                logger.info("Initializing RAG pipeline...")
                 self.rag_pipeline = RAGPipeline()
+                logger.info("RAG pipeline initialized successfully")
+            except ValueError as e:
+                # Quota/billing errors - provide helpful message
+                error_msg = str(e)
+                if "quota" in error_msg.lower() or "insufficient_quota" in error_msg.lower() or "429" in error_msg:
+                    logger.warning("=" * 80)
+                    logger.warning("RAG pipeline initialization failed: OpenAI API quota issue")
+                    logger.warning("=" * 80)
+                    logger.warning("The server will start without RAG features (scan explanations will be disabled).")
+                    logger.warning("")
+                    logger.warning("To enable RAG features, please:")
+                    logger.warning("1. Go to https://platform.openai.com/account/billing")
+                    logger.warning("2. Verify your payment method is active")
+                    logger.warning("3. Add credits to your account (not just a payment method)")
+                    logger.warning("4. Wait 5-10 minutes for quota to propagate")
+                    logger.warning("5. Restart the server")
+                    logger.warning("")
+                    logger.warning("Note: Adding a payment method alone may not add quota.")
+                    logger.warning("You may need to explicitly add credits or set up usage-based billing.")
+                    logger.warning("=" * 80)
+                else:
+                    logger.warning(f"RAG pipeline initialization failed: {e}")
+                self.rag_pipeline = None
             except Exception as e:
                 logger.warning(f"RAG pipeline initialization failed: {e}")
+                import traceback
+                logger.error(f"RAG pipeline initialization traceback: {traceback.format_exc()}")
                 self.rag_pipeline = None
         else:
+            logger.warning("RAGPipeline class is not available (import failed)")
             self.rag_pipeline = None
         
         # Temperature scaling (if available)
@@ -125,8 +193,8 @@ class DRPredictionService:
     def _load_model(self) -> DRModel:
         """Load trained model from Lightning checkpoint."""
         # Try to find the best model checkpoint
-        checkpoint_dir = "1/7d0928bb87954a739123ca35fa03cccf/checkpoints"
-        best_model_path = os.path.join(checkpoint_dir, "dr-model-epoch=11-val_qwk=0.769.ckpt")
+        checkpoint_dir = "1/7b2108ed09bf401fa06ff1b7d8c1e949/checkpoints"
+        best_model_path = os.path.join(checkpoint_dir, "dr-model-epoch=60-val_qwk=0.853.ckpt")
         
         if os.path.exists(best_model_path):
             logger.info(f"Loading trained model from {best_model_path}")
@@ -186,8 +254,13 @@ class DRPredictionService:
             self.temperature_scaler.load_state_dict(torch.load(scaler_path, map_location='cpu'))
             self.temperature_scaler.eval()
     
-    def preprocess_image(self, image_bytes: bytes) -> torch.Tensor:
-        """Preprocess uploaded image."""
+    def preprocess_image(self, image_bytes: bytes) -> Tuple[torch.Tensor, np.ndarray, np.ndarray]:
+        """Preprocess uploaded image.
+        Returns:
+            image_tensor: Normalized tensor for model input
+            image_np_normalized: Normalized numpy array (for denormalization)
+            original_image: Original unnormalized image (for Grad-CAM overlay)
+        """
         # Load image
         image = Image.open(io.BytesIO(image_bytes))
         image = image.convert('RGB')
@@ -195,50 +268,147 @@ class DRPredictionService:
         # Convert to numpy array
         image_np = np.array(image)
         
-        # Apply preprocessing
-        image_np = cv2.resize(image_np, (512, 512))
+        # Apply preprocessing - match training exactly
+        # Training uses [224, 224] from config
+        image_np = cv2.resize(image_np, (224, 224))
         
-        # Apply CLAHE
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        lab = cv2.cvtColor(image_np, cv2.COLOR_RGB2LAB)
-        lab[:, :, 0] = clahe.apply(lab[:, :, 0])
-        image_np = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+        # IMPORTANT: Do NOT apply CLAHE here - training doesn't use it
+        # The Albumentations transform only does resize + normalize
         
-        # Normalize
-        image_np = image_np.astype(np.float32) / 255.0
+        # Store original image before normalization (for Grad-CAM overlay)
+        original_image = image_np.copy()
+        
+        # Normalize - match training exactly
+        image_np_normalized = image_np.astype(np.float32) / 255.0
         mean = np.array([0.485, 0.456, 0.406])
         std = np.array([0.229, 0.224, 0.225])
-        image_np = (image_np - mean) / std
+        image_np_normalized = (image_np_normalized - mean) / std
         
         # Convert to tensor with proper dtype
-        image_tensor = torch.from_numpy(image_np).permute(2, 0, 1).unsqueeze(0).float()
+        image_tensor = torch.from_numpy(image_np_normalized).permute(2, 0, 1).unsqueeze(0).float()
         
-        return image_tensor, image_np
+        return image_tensor, image_np_normalized, original_image
+    
+    def _denormalize_image(self, image_np: np.ndarray) -> np.ndarray:
+        """Convert normalized image back to original scale for visualization."""
+        # Reverse normalization
+        mean = np.array([0.485, 0.456, 0.406])
+        std = np.array([0.229, 0.224, 0.225])
+        image_np = (image_np * std) + mean
+        
+        # Clip to valid range and convert to uint8
+        image_np = np.clip(image_np, 0, 1) * 255.0
+        image_np = image_np.astype(np.uint8)
+        
+        return image_np
+    
+    def predict_with_tta(self, image_tensor: torch.Tensor, num_augmentations: int = 5) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Predict with Test-Time Augmentation.
+        
+        Args:
+            image_tensor: Preprocessed image tensor
+            num_augmentations: Number of augmentations to apply
+            
+        Returns:
+            mean_pred: Averaged prediction probabilities
+            uncertainty: Prediction uncertainty
+        """
+        if A is None:
+            logger.warning("Albumentations not available, falling back to standard prediction")
+            return self.uncertainty_estimator.predict_with_uncertainty(image_tensor)
+        
+        self.model.eval()
+        predictions = []
+        
+        with torch.no_grad():
+            # Original prediction
+            mean_pred, _ = self.uncertainty_estimator.predict_with_uncertainty(image_tensor)
+            predictions.append(mean_pred.squeeze(0))
+            
+            # Define TTA transforms
+            tta_transforms = [
+                A.HorizontalFlip(p=1.0),
+                A.VerticalFlip(p=1.0),
+                A.RandomRotate90(p=1.0),
+                A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0.1, p=1.0),
+                A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=10, val_shift_limit=10, p=1.0),
+            ]
+            
+            # Generate augmented predictions
+            for i in range(min(num_augmentations, len(tta_transforms))):
+                transform = tta_transforms[i]
+                
+                # Convert tensor to numpy for augmentation
+                img_np = image_tensor.squeeze(0).permute(1, 2, 0).cpu().numpy()
+                
+                # Denormalize for augmentation
+                mean = np.array([0.485, 0.456, 0.406])
+                std = np.array([0.229, 0.224, 0.225])
+                img_np = (img_np * std) + mean
+                img_np = np.clip(img_np, 0, 1) * 255.0
+                img_np = img_np.astype(np.uint8)
+                
+                # Apply augmentation
+                aug_img = transform(image=img_np)['image']
+                
+                # Normalize again
+                aug_img = aug_img.astype(np.float32) / 255.0
+                aug_img = (aug_img - mean) / std
+                
+                # Convert back to tensor
+                aug_tensor = torch.from_numpy(aug_img).permute(2, 0, 1).unsqueeze(0).float()
+                
+                # Predict
+                aug_pred, _ = self.uncertainty_estimator.predict_with_uncertainty(aug_tensor)
+                predictions.append(aug_pred.squeeze(0))
+        
+        # Average all predictions
+        stacked_preds = torch.stack(predictions)
+        mean_prediction = stacked_preds.mean(dim=0, keepdim=True)
+        
+        # Calculate uncertainty as variance
+        uncertainty = stacked_preds.var(dim=0).sum()
+        
+        return mean_prediction, uncertainty
     
     def predict(
         self, 
         image_bytes: bytes,
         include_explanation: bool = True,
-        include_hint: bool = True
+        include_hint: bool = True,
+        use_tta: bool = True
     ) -> PredictionResponse:
-        """Make prediction on uploaded image."""
+        """Make prediction on uploaded image.
+        
+        Args:
+            image_bytes: Image bytes
+            include_explanation: Whether to include Grad-CAM explanation
+            include_hint: Whether to include clinical hints
+            use_tta: Whether to use Test-Time Augmentation (default: True)
+        """
         start_time = time.time()
         
         try:
             # Preprocess image
-            image_tensor, image_np = self.preprocess_image(image_bytes)
+            image_tensor, image_np_normalized, original_image = self.preprocess_image(image_bytes)
             
             # Get prediction with uncertainty
             with torch.no_grad():
                 # Ensure tensor is on CPU and correct dtype
                 image_tensor = image_tensor.cpu().float()
-                mean_pred, uncertainty = self.uncertainty_estimator.predict_with_uncertainty(image_tensor)
+                
+                # Use TTA if enabled, otherwise standard prediction
+                if use_tta:
+                    mean_pred, uncertainty = self.predict_with_tta(image_tensor, num_augmentations=5)
+                else:
+                    mean_pred, uncertainty = self.uncertainty_estimator.predict_with_uncertainty(image_tensor)
                 
                 # Apply temperature scaling if available
+                # NOTE: Temperature scaling requires raw logits, but we're using MC dropout
+                # which returns probabilities. If temperature scaling is needed in the future,
+                # we need to modify UncertaintyEstimator to also return logits.
                 if self.temperature_scaler:
-                    logits = torch.log(mean_pred + 1e-8)
-                    scaled_logits = self.temperature_scaler(logits)
-                    mean_pred = F.softmax(scaled_logits, dim=1)
+                    logger.warning("Temperature scaler loaded but not applied - requires logits, not probabilities")
                 
                 prediction = mean_pred.argmax(dim=1).item()
                 confidence = mean_pred.max().item()
@@ -259,16 +429,69 @@ class DRPredictionService:
             ).inc()
             MODEL_CONFIDENCE.set(confidence)
             
-            # Generate explanation (TEMPORARILY DISABLED due to blank heatmaps)
+            # Generate explanation with Grad-CAM heatmaps
             explanation = None
-            # Simplified explanation - just show what the model sees
-            if include_explanation:
-                explanation = {
-                    "prediction": prediction,
-                    "confidence": confidence,
-                    "class_name": grade_descriptions[prediction],
-                    "note": "Heatmap visualization temporarily disabled"
-                }
+            heatmap_for_scan_explanation = None  # Store heatmap for scan explanation
+            if include_explanation and not abstained:
+                try:
+                    logger.info(f"Generating Grad-CAM explanation for prediction {prediction} with confidence {confidence:.3f}")
+                    # Ensure tensor is correct dtype for Grad-CAM
+                    image_tensor_for_cam = image_tensor.float()
+                    
+                    # Use original image (already unnormalized) for overlay
+                    # Generate explanation with heatmaps
+                    explanation_raw = self.explainability_pipeline.explain_prediction(
+                        original_image, image_tensor_for_cam, prediction, confidence
+                    )
+                    
+                    logger.info(f"Explanation generated: {list(explanation_raw.keys())}")
+                    
+                    # Store heatmap for scan explanation generation (before base64 conversion)
+                    if 'gradcam_heatmap' in explanation_raw:
+                        heatmap_for_scan_explanation = explanation_raw['gradcam_heatmap']
+                    
+                    # Convert numpy arrays and images to base64 for JSON serialization
+                    explanation = {}
+                    for key, value in explanation_raw.items():
+                        if isinstance(value, np.ndarray):
+                            # Convert image arrays to base64
+                            if len(value.shape) == 3 and value.shape[2] == 3:  # RGB image (overlay)
+                                # Ensure uint8
+                                img = value.astype(np.uint8)
+                                img_pil = Image.fromarray(img)
+                                buffer = io.BytesIO()
+                                img_pil.save(buffer, format='PNG')
+                                img_str = base64.b64encode(buffer.getvalue()).decode()
+                                explanation[key + '_base64'] = img_str
+                            elif len(value.shape) == 2:  # 2D heatmap
+                                # Convert heatmap to image
+                                heatmap_normalized = (value - value.min()) / (value.max() - value.min() + 1e-8)
+                                heatmap_uint8 = (heatmap_normalized * 255).astype(np.uint8)
+                                heatmap_colored = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
+                                heatmap_pil = Image.fromarray(heatmap_colored)
+                                buffer = io.BytesIO()
+                                heatmap_pil.save(buffer, format='PNG')
+                                heatmap_str = base64.b64encode(buffer.getvalue()).decode()
+                                explanation[key + '_base64'] = heatmap_str
+                        elif isinstance(value, (int, float, str, bool, type(None))):
+                            explanation[key] = value
+                        elif isinstance(value, list):
+                            explanation[key] = value
+                        else:
+                            explanation[key] = str(value)
+                    
+                    logger.info(f"Explanation serialized successfully")
+                except Exception as e:
+                    logger.warning(f"Explanation generation failed: {e}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
+                    # Fallback explanation
+                    explanation = {
+                        "prediction": prediction,
+                        "confidence": confidence,
+                        "class_name": grade_descriptions[prediction],
+                        "error": f"Explanation generation failed: {str(e)}"
+                    }
             
             # Generate clinical hint (always user-friendly)
             clinical_hint = None
@@ -296,6 +519,89 @@ class DRPredictionService:
                     }
                     clinical_hint = hint_templates.get(prediction, "Please consult with an ophthalmologist for appropriate care.")
             
+            # Generate detailed scan explanations (what the model sees)
+            # Patient version (simpler, accessible)
+            scan_explanation = None
+            # Doctor version (detailed, technical)
+            scan_explanation_doctor = None
+            
+            # Check if RAG pipeline is available
+            if include_explanation and not abstained:
+                if self.rag_pipeline is None:
+                    logger.warning("RAG pipeline is not initialized. Scan explanations will not be generated.")
+                    logger.warning("To enable scan explanations, ensure OPENAI_API_KEY is set and RAG pipeline initializes correctly.")
+                elif self.rag_pipeline:
+                    try:
+                        logger.info(f"Generating scan explanations for prediction {prediction}")
+                        
+                        # Get image shape from original_image
+                        image_shape = (original_image.shape[0], original_image.shape[1])
+                        
+                        # Use stored heatmap (before base64 conversion)
+                        heatmap = heatmap_for_scan_explanation
+                        
+                        # Generate patient-friendly explanation
+                        try:
+                            logger.info("Generating patient-friendly scan explanation")
+                            logger.info(f"Parameters: dr_grade={prediction}, confidence={confidence:.3f}, heatmap={heatmap is not None}, image_shape={image_shape}")
+                            scan_result_patient = self.rag_pipeline.generate_scan_explanation(
+                                dr_grade=prediction,
+                                confidence=confidence,
+                                heatmap=heatmap,
+                                image_shape=image_shape,
+                                for_patient=True
+                            )
+                            
+                            logger.info(f"Scan result type: {type(scan_result_patient)}")
+                            logger.info(f"Scan result keys: {scan_result_patient.keys() if isinstance(scan_result_patient, dict) else 'Not a dict'}")
+                            
+                            if isinstance(scan_result_patient, dict) and 'explanation' in scan_result_patient:
+                                scan_explanation = scan_result_patient['explanation']
+                                logger.info(f"Patient explanation extracted: {scan_explanation[:100] if scan_explanation else 'None'}...")
+                            elif isinstance(scan_result_patient, str):
+                                scan_explanation = scan_result_patient
+                                logger.info(f"Patient explanation (string): {scan_explanation[:100] if scan_explanation else 'None'}...")
+                            else:
+                                logger.warning(f"Unexpected scan result format: {type(scan_result_patient)}")
+                                scan_explanation = None
+                            
+                            logger.info("Patient scan explanation generated successfully")
+                        except Exception as e:
+                            logger.warning(f"Patient scan explanation generation failed: {e}")
+                            import traceback
+                            logger.error(f"Patient scan explanation traceback: {traceback.format_exc()}")
+                            scan_explanation = None
+                        
+                        # Generate detailed doctor explanation
+                        try:
+                            logger.info("Generating detailed doctor scan explanation")
+                            scan_result_doctor = self.rag_pipeline.generate_scan_explanation(
+                                dr_grade=prediction,
+                                confidence=confidence,
+                                heatmap=heatmap,
+                                image_shape=image_shape,
+                                for_patient=False
+                            )
+                            
+                            if isinstance(scan_result_doctor, dict) and 'explanation' in scan_result_doctor:
+                                scan_explanation_doctor = scan_result_doctor['explanation']
+                            elif isinstance(scan_result_doctor, str):
+                                scan_explanation_doctor = scan_result_doctor
+                            
+                            logger.info("Doctor scan explanation generated successfully")
+                        except Exception as e:
+                            logger.warning(f"Doctor scan explanation generation failed: {e}")
+                            import traceback
+                            logger.error(f"Traceback: {traceback.format_exc()}")
+                            scan_explanation_doctor = None
+                    
+                    except Exception as e:
+                        logger.warning(f"Scan explanation generation failed: {e}")
+                        import traceback
+                        logger.error(f"Traceback: {traceback.format_exc()}")
+                        scan_explanation = None
+                        scan_explanation_doctor = None
+            
             processing_time = time.time() - start_time
             PREDICTION_LATENCY.observe(processing_time)
             
@@ -313,6 +619,8 @@ class DRPredictionService:
                 grade_description=grade_descriptions[prediction],
                 explanation=explanation,
                 clinical_hint=clinical_hint,
+                scan_explanation=scan_explanation,
+                scan_explanation_doctor=scan_explanation_doctor,
                 processing_time=processing_time,
                 abstained=abstained
             )
@@ -365,19 +673,35 @@ async def predict_dr(
 ):
     """Predict DR grade from uploaded image."""
     
-    # Validate file type
-    if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="File must be an image")
-    
-    # Read image bytes
-    image_bytes = await file.read()
-    
-    # Make prediction
-    result = prediction_service.predict(
-        image_bytes, include_explanation, include_hint
-    )
-    
-    return result
+    try:
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Read image bytes
+        image_bytes = await file.read()
+        
+        if len(image_bytes) == 0:
+            raise HTTPException(status_code=400, detail="Empty image file")
+        
+        # Make prediction
+        result = prediction_service.predict(
+            image_bytes, include_explanation, include_hint
+        )
+        
+        return result
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error in predict endpoint: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Internal server error during prediction: {str(e)}"
+        )
 
 
 @app.post("/predict_base64", response_model=PredictionResponse)

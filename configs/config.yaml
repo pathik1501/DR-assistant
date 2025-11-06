@@ -22,6 +22,8 @@ training:
   patience: 15           # More patience
   label_smoothing: 0.1   # Reduce overconfidence
   mixup_alpha: 0.4       # Mixup augmentation
+  use_class_weights: true  # Enable class weights for Focal Loss (handles imbalance)
+  use_weighted_sampling: false  # Enable weighted sampling (use with class_weights)
   
 # Data Augmentation
 augmentation:

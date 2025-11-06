@@ -22,102 +22,126 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for better UI
+# Custom CSS for compact UI
 st.markdown("""
 <style>
+    /* Reduce overall padding and margins */
+    .main .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    
+    /* Compact header */
     .main-header {
-        font-size: 2.5rem;
+        font-size: 1.2rem;
         font-weight: 700;
         color: #2C3E50;
         text-align: center;
-        margin-bottom: 1rem;
+        margin-bottom: 0.25rem;
+        padding: 0.25rem 0;
     }
     .sub-header {
-        font-size: 1.2rem;
+        font-size: 0.75rem;
         color: #7F8C8D;
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 0.5rem;
+        padding: 0;
     }
+    
+    /* Compact status bar */
+    .status-bar {
+        padding: 0.25rem 0.5rem;
+        margin: 0.25rem 0;
+        font-size: 0.85rem;
+    }
+    
+    /* Compact prediction card */
     .prediction-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
-        border-radius: 15px;
+        padding: 0.75rem;
+        border-radius: 8px;
         color: white;
-        margin: 1rem 0;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        margin: 0.25rem 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    .grade-0 { 
-        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    
+    /* Smaller images */
+    .compact-image {
+        max-width: 250px;
+        max-height: 200px;
+        margin: 0 auto;
+        display: block;
+    }
+    .stImage img {
+        max-width: 250px !important;
+        max-height: 200px !important;
+        object-fit: contain;
+    }
+    [data-testid="stImage"] img {
+        max-width: 250px !important;
+        max-height: 200px !important;
+    }
+    
+    /* Compact grade cards */
+    .grade-0, .grade-1, .grade-2, .grade-3, .grade-4 { 
         color: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin: 1rem 0;
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin: 0.25rem 0;
     }
-    .grade-1 { 
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin: 1rem 0;
-    }
-    .grade-2 { 
-        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin: 1rem 0;
-    }
-    .grade-3 { 
-        background: linear-gradient(135deg, #ff9a56 0%, #ff6a88 100%);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin: 1rem 0;
-    }
-    .grade-4 { 
-        background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin: 1rem 0;
-    }
+    .grade-0 { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+    .grade-1 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .grade-2 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .grade-3 { background: linear-gradient(135deg, #ff9a56 0%, #ff6a88 100%); }
+    .grade-4 { background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); }
+    
+    /* Compact hint box */
     .hint-box {
         background: #F8F9FA;
-        padding: 1.5rem;
-        border-radius: 10px;
-        border-left: 5px solid #667eea;
-        margin: 1rem 0;
+        padding: 0.5rem;
+        border-radius: 6px;
+        border-left: 3px solid #667eea;
+        margin: 0.25rem 0;
+        color: #2C3E50 !important;
+        font-size: 0.85rem;
     }
+    
+    /* Reduce section spacing */
+    .section-spacing {
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    /* Compact metric box */
     .metric-box {
         background: white;
-        padding: 1rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 0.5rem;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         text-align: center;
     }
-    .success-badge {
-        background: #27AE60;
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
+    
+    /* Smaller badges */
+    .success-badge, .warning-badge, .danger-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
         font-weight: bold;
         display: inline-block;
+        font-size: 0.8rem;
     }
-    .warning-badge {
-        background: #F39C12;
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        font-weight: bold;
-        display: inline-block;
+    .success-badge { background: #27AE60; color: white; }
+    .warning-badge { background: #F39C12; color: white; }
+    .danger-badge { background: #E74C3C; color: white; }
+    
+    /* Reduce Streamlit default spacing */
+    div[data-testid="stVerticalBlock"] > div {
+        gap: 0.5rem;
     }
-    .danger-badge {
-        background: #E74C3C;
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        font-weight: bold;
-        display: inline-block;
+    
+    /* Compact file uploader */
+    .uploadedFile {
+        padding: 0.25rem;
+        margin: 0.25rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -190,28 +214,28 @@ class ModernDRFrontend:
         icon = self.grade_icons[prediction]
         color = self.grade_colors[prediction]
         
-        # Main prediction card
+        # Compact prediction card
         st.markdown(f"""
         <div class="prediction-card" style="background: linear-gradient(135deg, {color} 0%, {color}dd 100%);">
             <div style="text-align: center;">
-                <div style="font-size: 4rem; margin-bottom: 1rem;">{icon}</div>
-                <h1 style="margin: 0; color: white;">Grade {prediction}</h1>
-                <h2 style="margin: 0.5rem 0; color: white; font-weight: 400;">{grade_description}</h2>
-                <div style="margin-top: 1rem;">
-                    <span style="font-size: 1.5rem; color: white;">Confidence: {confidence:.1%}</span>
+                <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">{icon}</div>
+                <h2 style="margin: 0; color: white; font-size: 1.1rem;">Grade {prediction}</h2>
+                <p style="margin: 0.15rem 0; color: white; font-size: 0.85rem; opacity: 0.95;">{grade_description}</p>
+                <div style="margin-top: 0.25rem;">
+                    <span style="font-size: 0.95rem; color: white; font-weight: 600;">Confidence: {confidence:.1%}</span>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Confidence indicator
+        # Smaller confidence indicator
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             fig = go.Figure(go.Indicator(
                 mode = "gauge+number",
                 value = confidence * 100,
                 domain = {'x': [0, 1], 'y': [0, 1]},
-                title = {'text': "Model Confidence"},
+                title = {'text': "Confidence", 'font': {'size': 12}},
                 gauge = {
                     'axis': {'range': [None, 100]},
                     'bar': {'color': color},
@@ -221,17 +245,14 @@ class ModernDRFrontend:
                         {'range': [80, 100], 'color': "darkgray"}
                     ],
                     'threshold': {
-                        'line': {'color': "white", 'width': 4},
-                        'thickness': 0.75,
+                        'line': {'color': "white", 'width': 2},
+                        'thickness': 0.6,
                         'value': 70
                     }
                 }
             ))
-            fig.update_layout(height=250)
+            fig.update_layout(height=120, margin=dict(l=10, r=10, t=20, b=10))
             st.plotly_chart(fig, use_container_width=True)
-        
-        # Processing info
-        st.caption(f"⚡ Processed in {processing_time:.2f} seconds")
     
     def display_clinical_hint(self, hint: str):
         """Display clinical hint in a user-friendly way."""
@@ -241,56 +262,120 @@ class ModernDRFrontend:
         st.markdown("### 💡 Clinical Recommendation")
         st.markdown(f"""
         <div class="hint-box">
-            <p style="font-size: 1.1rem; margin: 0; line-height: 1.6;">{hint}</p>
+            <p style="font-size: 0.95rem; margin: 0; line-height: 1.5; color: #2C3E50;">{hint}</p>
         </div>
         """, unsafe_allow_html=True)
+        st.caption("ℹ️ AI-assisted recommendation. Consult an ophthalmologist for professional medical advice.")
+    
+    def display_scan_explanation(self, scan_explanation: str = None, scan_explanation_doctor: str = None):
+        """Display scan explanations (patient and doctor versions)."""
+        if not scan_explanation and not scan_explanation_doctor:
+            return
         
-        st.markdown("---")
-        st.info("ℹ️ **Note**: This is an AI-assisted recommendation. Always consult with a qualified ophthalmologist for professional medical advice and diagnosis.")
+        st.markdown("### 📝 Scan Analysis")
+        
+        # Use tabs for compact display
+        if scan_explanation and scan_explanation_doctor:
+            tab1, tab2 = st.tabs(["👤 Patient View", "👨‍⚕️ Clinical View"])
+            with tab1:
+                st.markdown(f"<p style='font-size: 0.9rem; line-height: 1.6;'>{scan_explanation}</p>", unsafe_allow_html=True)
+            with tab2:
+                st.markdown(f"<p style='font-size: 0.9rem; line-height: 1.6;'>{scan_explanation_doctor}</p>", unsafe_allow_html=True)
+                st.caption("ℹ️ Technical medical terminology for healthcare professionals.")
+        elif scan_explanation:
+            st.markdown(f"<p style='font-size: 0.9rem; line-height: 1.6;'>{scan_explanation}</p>", unsafe_allow_html=True)
+        elif scan_explanation_doctor:
+            with st.expander("👨‍⚕️ Clinical Explanation", expanded=False):
+                st.markdown(f"<p style='font-size: 0.9rem; line-height: 1.6;'>{scan_explanation_doctor}</p>", unsafe_allow_html=True)
+                st.caption("ℹ️ Technical medical terminology for healthcare professionals.")
     
     def display_explanation(self, explanation: dict):
-        """Display explanation if available."""
+        """Display heatmaps if available - compact version in collapsible section."""
         if not explanation:
             return
         
-        st.markdown("### 🔍 Model Explanation")
+        # Check if we have base64 images from API
+        has_heatmaps = False
         
-        if explanation.get('note'):
-            st.info(explanation['note'])
-        else:
-            # If we have actual heatmaps (future implementation)
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write("**Grad-CAM Heatmap**")
-                st.info("Heatmap visualization will be displayed here when available.")
-            with col2:
-                st.write("**Overlay Visualization**")
-                st.info("Overlay visualization will be displayed here when available.")
+        # Collect all available heatmaps
+        heatmaps = []
+        if 'gradcam_heatmap_base64' in explanation:
+            has_heatmaps = True
+            try:
+                img_bytes = base64.b64decode(explanation['gradcam_heatmap_base64'])
+                heatmaps.append(("Grad-CAM", img_bytes, "Heatmap"))
+            except:
+                pass
+                
+        if 'gradcam_overlay_base64' in explanation:
+            has_heatmaps = True
+            try:
+                img_bytes = base64.b64decode(explanation['gradcam_overlay_base64'])
+                heatmaps.append(("Grad-CAM", img_bytes, "Overlay"))
+            except:
+                pass
+                
+        if 'gradcam_plus_heatmap_base64' in explanation:
+            has_heatmaps = True
+            try:
+                img_bytes = base64.b64decode(explanation['gradcam_plus_heatmap_base64'])
+                heatmaps.append(("Grad-CAM++", img_bytes, "Heatmap"))
+            except:
+                pass
+                
+        if 'gradcam_plus_overlay_base64' in explanation:
+            has_heatmaps = True
+            try:
+                img_bytes = base64.b64decode(explanation['gradcam_plus_overlay_base64'])
+                heatmaps.append(("Grad-CAM++", img_bytes, "Overlay"))
+            except:
+                pass
+        
+        # Display in compact grid (2 columns)
+        if has_heatmaps and heatmaps:
+            st.caption("Visualization of which areas of the image the model focused on for its prediction.")
+            # Group by method
+            cols = st.columns(2)
+            for idx, (method, img_bytes, view_type) in enumerate(heatmaps):
+                col_idx = idx % 2
+                with cols[col_idx]:
+                    try:
+                        img = Image.open(io.BytesIO(img_bytes))
+                        # Resize image to be much smaller
+                        max_size = (200, 200)
+                        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+                        st.image(img, caption=f"{method} {view_type}", use_container_width=False)
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+        
+        # If no visualizations, show fallback
+        if not has_heatmaps:
+            if explanation.get('error'):
+                st.error(f"❌ {explanation['error']}")
+            elif explanation.get('note'):
+                st.info(explanation['note'])
+            else:
+                st.info("ℹ️ Heatmap visualization not available")
 
 
 def main():
     """Main Streamlit app."""
     
-    # Header
+    # Compact header
     st.markdown('<h1 class="main-header">👁️ Diabetic Retinopathy Detection Assistant</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">AI-Powered Retinal Image Analysis for Early Detection</p>', unsafe_allow_html=True)
     
-    # Initialize frontend
+    # Initialize frontend and check API connection (silently)
     frontend = ModernDRFrontend()
-    
-    # Check API connection
     if not frontend.check_api_connection():
         st.error("❌ **Cannot connect to API server**")
         st.info("Please ensure the API server is running on `localhost:8080`")
         st.code("python src/inference.py", language="bash")
         st.stop()
-    else:
-        st.success("✅ **API Connected** - Ready for analysis")
     
     st.markdown("---")
     
-    # Main content area
-    col1, col2 = st.columns([1, 1])
+    # Main content area - adjust column ratios for better space usage
+    col1, col2 = st.columns([1.2, 1.3])
     
     with col1:
         st.markdown("### 📤 Upload Image")
@@ -302,12 +387,16 @@ def main():
         
         if uploaded_file is not None:
             image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded Retinal Image", use_container_width=True)
+            # Resize image to be much smaller
+            max_size = (250, 200)
+            img_resized = image.copy()
+            img_resized.thumbnail(max_size, Image.Resampling.LANCZOS)
+            st.image(img_resized, caption="Uploaded Image", use_container_width=False)
             
-            # Options
-            st.markdown("### ⚙️ Analysis Options")
-            include_explanation = st.checkbox("Include Model Explanation", value=False, help="Show Grad-CAM heatmaps (when available)")
-            include_hint = st.checkbox("Include Clinical Recommendation", value=True, help="Get AI-generated clinical guidance")
+            # Options - more compact
+            st.markdown("### ⚙️ Options")
+            include_explanation = st.checkbox("Show Heatmaps & Scan Analysis", value=True, help="Includes Grad-CAM visualizations and detailed scan explanations")
+            include_hint = st.checkbox("Clinical Advice", value=True, help="AI-generated clinical recommendations")
             
             # Analyze button
             if st.button("🔍 Analyze Image", type="primary", use_container_width=True):
@@ -345,45 +434,55 @@ def main():
             else:
                 st.warning("⚠️ Clinical recommendation not available for this analysis.")
             
-            # Explanation (if requested)
+            # Scan explanations (patient and doctor versions) - always show if available
+            scan_explanation = result.get('scan_explanation')
+            scan_explanation_doctor = result.get('scan_explanation_doctor')
+            if scan_explanation or scan_explanation_doctor:
+                st.markdown("---")  # Add separator
+                frontend.display_scan_explanation(scan_explanation, scan_explanation_doctor)
+            
+            # Heatmaps (separate, collapsible section) - less important
             if result.get('explanation'):
-                frontend.display_explanation(result['explanation'])
+                st.markdown("---")  # Add separator
+                with st.expander("🔍 Model Attention Heatmaps (Optional)", expanded=False):
+                    frontend.display_explanation(result['explanation'])
             
-            # Additional info
-            with st.expander("📋 Detailed Information"):
-                st.json(result)
-            
-            # Download report
-            report = {
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "prediction": result['prediction'],
-                "grade": result['grade_description'],
-                "confidence": result['confidence'],
-                "clinical_hint": clinical_hint,
-                "processing_time": result.get('processing_time', 0)
-            }
-            
-            st.download_button(
-                label="📥 Download Report",
-                data=json.dumps(report, indent=2),
-                file_name=f"dr_analysis_{int(time.time())}.json",
-                mime="application/json",
-                use_container_width=True
-            )
+            # Download and details in compact row
+            col_dl, col_det = st.columns([1, 1])
+            with col_dl:
+                report = {
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "prediction": result['prediction'],
+                    "grade": result['grade_description'],
+                    "confidence": result['confidence'],
+                    "clinical_hint": clinical_hint,
+                    "scan_explanation": result.get('scan_explanation'),
+                    "scan_explanation_doctor": result.get('scan_explanation_doctor'),
+                    "processing_time": result.get('processing_time', 0)
+                }
+                st.download_button(
+                    label="📥 Download Report",
+                    data=json.dumps(report, indent=2),
+                    file_name=f"dr_analysis_{int(time.time())}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+            with col_det:
+                with st.expander("📋 Full Details"):
+                    st.json(result)
         else:
             st.info("👆 Upload an image and click 'Analyze Image' to see results here.")
     
-    # Footer
+    # Compact footer
     st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; color: #7F8C8D; padding: 2rem;">
-        <p><strong>Diabetic Retinopathy Detection Assistant</strong></p>
-        <p>Powered by EfficientNet-B0 | QWK: 0.785</p>
-        <p style="font-size: 0.8rem;">⚠️ For research and educational purposes only. Not intended for clinical diagnosis.</p>
+    <div style="text-align: center; color: #7F8C8D; padding: 0.5rem;">
+        <p style="font-size: 0.75rem; margin: 0.1rem 0;"><strong>DR Assistant</strong> | EfficientNet-B0 | ⚠️ Research use only</p>
     </div>
     """, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
     main()
+
 

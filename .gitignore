@@ -51,6 +51,7 @@ data/
 models/
 checkpoints/
 *.ckpt
+!1/7b2108ed09bf401fa06ff1b7d8c1e949/checkpoints/dr-model-epoch=60-val_qwk=0.853.ckpt
 *.pth
 
 # Logs and outputs
@@ -116,8 +117,11 @@ mlruns/
 data/vector_db/
 *.faiss
 *.pkl
+*.index
 
 # Test outputs
 test_*.json
 *_test_output.json
+
+
 

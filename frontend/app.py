@@ -172,57 +172,71 @@ class DRFrontend:
         
         st.subheader("🔍 Model Explanation")
         
-        col1, col2 = st.columns(2)
+        # Check if we have base64 images (from API)
+        has_heatmaps = False
         
-        with col1:
-            st.write("**Grad-CAM Heatmap**")
-            # Display heatmap (assuming it's stored as base64 or numpy array)
-            if 'gradcam_heatmap' in explanation:
-                heatmap = explanation['gradcam_heatmap']
-                if isinstance(heatmap, list):
-                    heatmap = np.array(heatmap)
-                
-                # Create heatmap visualization
-                fig = px.imshow(
-                    heatmap,
-                    color_continuous_scale='jet',
-                    title="Attention Heatmap"
-                )
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+        # Grad-CAM Heatmap
+        if 'gradcam_heatmap_base64' in explanation:
+            has_heatmaps = True
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Grad-CAM Heatmap**")
+                img_bytes = base64.b64decode(explanation['gradcam_heatmap_base64'])
+                img = Image.open(io.BytesIO(img_bytes))
+                st.image(img, use_container_width=True, caption="Attention Heatmap")
+            
+            with col2:
+                st.write("**Grad-CAM Overlay**")
+                if 'gradcam_overlay_base64' in explanation:
+                    img_bytes = base64.b64decode(explanation['gradcam_overlay_base64'])
+                    img = Image.open(io.BytesIO(img_bytes))
+                    st.image(img, use_container_width=True, caption="Original + Heatmap")
         
-        with col2:
-            st.write("**Overlay Visualization**")
-            if 'gradcam_overlay' in explanation:
-                overlay = explanation['gradcam_overlay']
-                if isinstance(overlay, list):
-                    overlay = np.array(overlay)
-                
-                # Display overlay
-                fig = px.imshow(
-                    overlay,
-                    title="Original Image with Heatmap Overlay"
-                )
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+        # Grad-CAM++ if available
+        if 'gradcam_plus_heatmap_base64' in explanation:
+            has_heatmaps = True
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Grad-CAM++ Heatmap**")
+                img_bytes = base64.b64decode(explanation['gradcam_plus_heatmap_base64'])
+                img = Image.open(io.BytesIO(img_bytes))
+                st.image(img, use_container_width=True, caption="Grad-CAM++ Attention")
+            
+            with col2:
+                st.write("**Grad-CAM++ Overlay**")
+                if 'gradcam_plus_overlay_base64' in explanation:
+                    img_bytes = base64.b64decode(explanation['gradcam_plus_overlay_base64'])
+                    img = Image.open(io.BytesIO(img_bytes))
+                    st.image(img, use_container_width=True, caption="Original + Grad-CAM++")
+        
+        # If no visualizations available
+        if not has_heatmaps:
+            st.info("ℹ️ Heatmap visualization not available in the response")
     
-    def display_clinical_hint(self, hint_data: dict):
+    def display_clinical_hint(self, clinical_hint):
         """Display clinical hint."""
-        if not hint_data:
+        if not clinical_hint:
             return
         
         st.subheader("💡 Clinical Recommendation")
         
-        # Main hint
-        st.info(f"**{hint_data['hint']}**")
-        
-        # Sources
-        if 'sources' in hint_data and hint_data['sources']:
-            with st.expander("📚 Evidence Sources"):
-                for i, source in enumerate(hint_data['sources']):
-                    st.write(f"**Source {i+1}**: {source['source']}")
-                    st.write(f"*{source['content']}*")
-                    st.write("---")
+        # Handle both string and dict formats
+        if isinstance(clinical_hint, dict):
+            # Old format with dict
+            st.info(f"**{clinical_hint.get('hint', 'No recommendation available')}**")
+            
+            # Sources
+            if 'sources' in clinical_hint and clinical_hint['sources']:
+                with st.expander("📚 Evidence Sources"):
+                    for i, source in enumerate(clinical_hint['sources']):
+                        st.write(f"**Source {i+1}**: {source.get('source', 'Unknown')}")
+                        st.write(f"*{source.get('content', '')}*")
+                        st.write("---")
+        else:
+            # New format - just a string
+            st.info(f"**{clinical_hint}**")
     
     def create_download_report(self, result: dict, image_bytes: bytes) -> str:
         """Create downloadable JSON report."""
