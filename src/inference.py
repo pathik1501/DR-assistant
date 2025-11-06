@@ -761,10 +761,13 @@ def main():
     """Run the FastAPI server."""
     api_config = yaml.safe_load(open("configs/config.yaml"))['api']
     
+    # Use PORT environment variable if set (for Railway/Render deployment)
+    port = int(os.environ.get('PORT', api_config['port']))
+    
     uvicorn.run(
         "src.inference:app",
         host=api_config['host'],
-        port=api_config['port'],
+        port=port,
         workers=api_config['workers'],
         reload=False
     )

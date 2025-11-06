@@ -1,5 +1,7 @@
 // DR Assistant Frontend - JavaScript Application
-const API_URL = 'http://localhost:8080';
+// API URL: Use config.js (loaded before this script) or default to localhost for development
+// config.js sets window.API_URL from Netlify environment variable
+const API_URL = window.API_URL || 'http://localhost:8080';
 
 // DOM Elements
 const imageInput = document.getElementById('image-input');
